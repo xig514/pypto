@@ -53,6 +53,7 @@ T GetKwarg(const std::vector<std::pair<std::string, std::any>>& kwargs, const st
   throw ValueError("Missing kwarg: " + key);
 }
 
+
 TypePtr DeduceBlockGetBlockIdxType(const std::vector<ExprPtr>& args,
                                    const std::vector<std::pair<std::string, std::any>>& kwargs,
                                    const std::string& op_name) {
@@ -224,9 +225,21 @@ TypePtr DeduceBlockCreateTileType(const std::vector<ExprPtr>& args,
   }
 
   CHECK(!tile_shape.empty()) << "The operator " << op_name << " requires non-empty shape";
+  int size = 0;
+  size = GetKwarg<int>(kwargs, "memref_size", size);
+  if (size != 0) {
+    auto addr = GetKwarg<int>(kwargs, "memref_addr");
+    auto addr_expr =
+          std::make_shared<ConstInt>(static_cast<int>(addr), DataType::INT64, Span::unknown());
+    auto id = GetKwarg<int>(kwargs, "memref_id");
+    auto mem_space = static_cast<MemorySpace>(GetKwarg<int>(kwargs, "memref_id"));
 
+    auto memref = std::make_shared<MemRef>(mem_space, addr_expr, size, id);
+    return std::make_shared<TileType>(tile_shape, dtype, memref);
+  } else {
+    return std::make_shared<TileType>(tile_shape, dtype);
+  }
   // Return TileType with the static shape and dtype
-  return std::make_shared<TileType>(tile_shape, dtype);
 }
 
 // ============================================================================
@@ -247,6 +260,9 @@ REGISTER_OP("block.create_tile")
     .set_description("Create a tile")
     .add_argument("shape", "Shape dimensions (TupleType of ScalarType(UINT64))")
     .set_attr<DataType>("dtype")
+    .set_attr<DataType>("memref_addr")
+    .set_attr<DataType>("memref_size")
+    .set_attr<DataType>("memref_id")
     .set_attr<int>("target_memory")
     .f_deduce_type([](const std::vector<ExprPtr>& args,
                       const std::vector<std::pair<std::string, std::any>>& kwargs) {

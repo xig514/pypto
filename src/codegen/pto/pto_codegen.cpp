@@ -158,6 +158,7 @@ std::string PTOCodegen::Generate(const ProgramPtr& program) {
           "Function '" +
           func->name_ + "' is marked as Orchestration. ");
     }
+    printf("generate function %s=====================\n",func->name_.c_str());
     GenerateFunction(func);
   }
 
@@ -181,7 +182,7 @@ void PTOCodegen::GenerateFunction(const FunctionPtr& func) {
   body_section_.clear();
 
   BuildVarToMemRefMapping(func);
-
+  printf("11111111111\n");
   MemRefCollectorVisitor collector;
   if (func->body_) {
     collector.VisitStmt(func->body_);
@@ -190,7 +191,9 @@ void PTOCodegen::GenerateFunction(const FunctionPtr& func) {
   for (const auto& memref : collector.GetMemRefs()) {
     std::string tile_buf = NewTemp();
     memref_to_mlir_[memref.get()] = tile_buf;
+    printf("memref id is %ld\n", memref->id_);
   }
+  printf("22222222222222\n");
 
   stream_ << "  func.func @" << func->name_ << "(";
 
@@ -212,6 +215,7 @@ void PTOCodegen::GenerateFunction(const FunctionPtr& func) {
       stream_ << "!pto.ptr<f32>";
     }
   }
+  printf("3333333333333333\n");
 
   stream_ << ") {\n";
   indent_level_++;
@@ -240,6 +244,7 @@ void PTOCodegen::GenerateFunction(const FunctionPtr& func) {
       }
     }
   }
+  printf("44444444444444444\n");
 
   auto saved_stream = std::move(stream_);
   stream_ = std::move(body_section_);
@@ -247,6 +252,7 @@ void PTOCodegen::GenerateFunction(const FunctionPtr& func) {
   if (func->body_) {
     VisitStmt(func->body_);
   }
+  printf("5555555555555\n");
 
   std::string body_content = stream_.str();
   stream_ = std::move(saved_stream);
@@ -355,13 +361,16 @@ std::string PTOCodegen::GetTileBufForMemRef(const MemRefPtr& memref) {
 
 void PTOCodegen::VisitStmt_(const AssignStmtPtr& op) {
   if (auto call = As<ir::Call>(op->value_)) {
+    printf("PTOCodegen::VisitStmt_ AssignStmtPtr for op %s\n", call->op_->name_.c_str());
     if (backend_ != nullptr && backend_->GetOpInfo(call->op_->name_) != nullptr) {
+      printf("Found AssignStmtPtr for op %s\n", call->op_->name_.c_str());
       std::string result_buf;
       if (auto tile_type = As<TileType>(op->var_->GetType())) {
         if (tile_type->memref_.has_value()) {
           result_buf = GetTileBufForMemRef(tile_type->memref_.value());
         }
       }
+      printf("result_buf is %s\n", result_buf.c_str());
       current_result_buf_ = result_buf;
       VisitExpr(op->value_);
       current_result_buf_.clear();

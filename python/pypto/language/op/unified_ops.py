@@ -247,8 +247,23 @@ def cast(
 # ---------------------------------------------------------------------------
 
 
-def create_tile(shape: list[int], dtype: DataType, target_memory: int) -> Tile:
-    """Create a tile at specific memoryspace.
-    target_memory: (1=UB, 2=L1, 3=L0A, 4=L0B)
+def create_tile(
+    shape: list[int],
+    dtype: DataType,
+    target_memory: int = 1,
+    addr: Optional[Union[int, Expr]] = None,
+    size: Optional[int] = None,
+    mem_id: Optional[int] = None,
+) -> Tile:
+    """Create a tile at specific memory space, with optional explicit MemRef.
+
+    Args:
+        shape: Shape of the tile
+        dtype: Data type of the tile
+        target_memory: (1=UB, 2=L1, 3=L0A, 4=L0B)
+        addr: Optional memory address
+        size: Optional memory size in bytes
+        mem_id: Optional MemRef unique identifier
     """
-    return _block.create_tile(shape, dtype, target_memory)
+    return _block.create_tile(shape, dtype, target_memory,
+                               addr=addr, size=size, mem_id=mem_id)

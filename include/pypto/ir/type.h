@@ -295,16 +295,6 @@ class TileType : public ShapedType {
       : ShapedType(dtype, std::move(shape)), tile_view_(std::nullopt) {}
 
   /**
-   * @brief Create a tile type with memory reference (shared_ptr)
-   *
-   * @param shape Shape dimensions (supports multi-dimensional tensors)
-   * @param dtype Element data type
-   * @param memref Memory reference (shared pointer)
-   */
-  TileType(std::vector<ExprPtr> shape, DataType dtype, MemRefPtr memref)
-      : ShapedType(dtype, std::move(shape), std::move(memref)), tile_view_(std::nullopt) {}
-
-  /**
    * @brief Create a tile type with optional memory reference (shared_ptr)
    *
    * @param shape Shape dimensions (supports multi-dimensional tensors)

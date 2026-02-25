@@ -22,7 +22,10 @@ namespace ir {
 
 void IRVisitor::VisitExpr(const ExprPtr& expr) { ExprFunctor<void>::VisitExpr(expr); }
 
-void IRVisitor::VisitStmt(const StmtPtr& stmt) { StmtFunctor<void>::VisitStmt(stmt); }
+void IRVisitor::VisitStmt(const StmtPtr& stmt) {
+  printf("Try visit statement %s\n", stmt->TypeName().c_str());
+  StmtFunctor<void>::VisitStmt(stmt); 
+}
 
 // Leaf nodes - no children to visit
 void IRVisitor::VisitExpr_(const VarPtr& op) {
