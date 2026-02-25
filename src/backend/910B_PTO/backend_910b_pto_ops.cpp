@@ -58,6 +58,16 @@ static std::string MakeBinaryTileScalarCodegenPTO(const std::string& pto_op_name
   return oss.str();
 }
 
+static std::string MakeBlockCreateTileCodegenPTO(const CallPtr& op, codegen::CodegenBase& codegen_base) {
+  auto& codegen = dynamic_cast<codegen::PTOCodegen&>(codegen_base);
+  auto shape = As<ir::MakeTuple>(op->args_[0]);
+  INTERNAL_CHECK(shape) << "block.create_tile first argument must be a tuple (shapes)";
+  int64_t shape0 = codegen.GetConstIntValue(shape->elements_[0]);
+  int64_t shape1 = codegen.GetConstIntValue(shape->elements_[1]);
+  printf("shape0 is %ld and shape1 is %ld\n", shape0, shape1);
+  return "";
+}
+
 // block.load: emit pto.subview + pto.tload (same format as original IR layer codegen)
 static std::string MakeBlockLoadCodegenPTO(const CallPtr& op, codegen::CodegenBase& codegen_base) {
   auto& codegen = dynamic_cast<codegen::PTOCodegen&>(codegen_base);
@@ -226,7 +236,12 @@ REGISTER_BACKEND_OP(Backend910B_PTO, "block.subs")
 // ============================================================================
 // Memory Operations
 // ============================================================================
-
+REGISTER_BACKEND_OP(Backend910B_PTO, "block.create_tile")
+    .set_pipe(ir::PipeType::S)
+    .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
+      return MakeBlockCreateTileCodegenPTO(op, codegen);
+    });
+  
 REGISTER_BACKEND_OP(Backend910B_PTO, "block.load")
     .set_pipe(ir::PipeType::MTE2)
     .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {

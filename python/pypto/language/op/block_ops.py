@@ -13,7 +13,7 @@ This module provides type-safe wrappers around pypto.ir.op.block operations
 that accept and return Tile types instead of raw Expr/Call objects.
 """
 
-from typing import Literal, Union
+from typing import Literal, Optional, Union 
 
 __all__ = [
     "create_tile",
@@ -77,18 +77,29 @@ def create_tile(
     shape: list[int],
     dtype: DataType,
     target_memory: int = 1,
+    addr: Optional[Union[int, Expr]] = None,
+    size: Optional[int] = None,
+    mem_id: Optional[int] = None,
 ) -> Tile:
-    """Create a tile from a shape.
+    """Create a tile from a shape, with optional explicit MemRef.
 
     Args:
         shape: Shape of the tile
         dtype: Data type of the tile
         target_memory: Target memory level (1=UB, 2=L1, 3=L0A, 4=L0B)
+        addr: Optional memory address (int or Expr)
+        size: Optional memory size in bytes
+        mem_id: Optional MemRef unique identifier
 
     Returns:
         Tile wrapping the create_tile operation
+
+    Example:
+        >>> tile = pl.block.create_tile([32, 32], pl.FP32, target_memory=1,
+        ...                              addr=0x1000, size=4096, mem_id=0)
     """
-    call_expr = _ir_ops.create_tile(shape, dtype, target_memory)
+    call_expr = _ir_ops.create_tile(shape, dtype, target_memory,
+                                    addr=addr, size=size, mem_id=mem_id)
     return Tile(expr=call_expr)
 
 

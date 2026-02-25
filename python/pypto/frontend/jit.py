@@ -19,6 +19,8 @@ import functools
 import inspect
 import torch
 from pypto.pypto_core.codegen import PTOCodegen
+from pypto import backend
+from pypto.backend import BackendType
 
 _jit_functions = {}
 _kernel_functions = {}
@@ -32,6 +34,8 @@ def _get_mlir_code(result):
 
 
 def compile(prog, clean_up=False, timeout=20):
+    backend.reset_for_testing()
+    backend.set_backend_type(BackendType.PTO)
     Path("./build").mkdir(parents=True, exist_ok=True)
     ir_path = "./build/temp.pto"  # TODO: use Python `tempfile` module
     raw_cpp_path = "./build/temp_generated.cpp"
@@ -123,7 +127,7 @@ def load_lib(lib_path, clean_up=False):
 
 
 def launch(stream=None, block_dim=1, compiled_result="", *tensors):
-    if compiled_result is "":
+    if compiled_result == "":
         raise RuntimeError("Compile error is empty")
     
     # compiled_func = load_lib(compiled_result)

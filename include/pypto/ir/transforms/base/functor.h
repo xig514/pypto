@@ -100,6 +100,7 @@ class ExprFunctor {
 
 template <typename R, typename... Args>
 R ExprFunctor<R, Args...>::VisitExpr(const ExprPtr& expr, Args... args) {
+  printf("Try visit expr %s\n", expr->TypeName().c_str());
   // Leaf nodes
   // Note: IterArg and MemRef must be checked before Var since they inherit from Var
   EXPR_FUNCTOR_DISPATCH(IterArg);

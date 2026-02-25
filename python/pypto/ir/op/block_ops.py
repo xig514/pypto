@@ -26,28 +26,55 @@ from ..utils import _get_span_or_capture, _normalize_expr
 # Memory Operations
 # ============================================================================
 
-
 def create_tile(
     shape: Sequence[int],
     dtype: DataType,
     target_memory: int = 1,
+    addr: Optional[Union[int, Expr]] = None,
+    size: Optional[int] = None,
+    mem_id: Optional[int] = None,
     span: Optional[Span] = None,
 ) -> Call:
-    """Create a tile from a shape.
+    """Create a tile from a shape, with optional explicit MemRef specification.
 
     Args:
         shape: Shape of the tile
         dtype: Data type of the tile
         target_memory: Target memory level (1=UB, 2=L1, 3=L0A, 4=L0B)
+        addr: Optional memory address (int or Expr). When provided with size
+              and mem_id, creates a tile with explicit MemRef.
+        size: Optional memory size in bytes. Required when addr is provided.
+        mem_id: Optional MemRef unique identifier. Required when addr is provided.
         span: Optional source span for debugging (auto-captured if not provided)
 
     Returns:
         Call expression that returns a TileType with the created tile
+
+    Example:
+        >>> # Without explicit MemRef (original behavior)
+        >>> tile = create_tile([32, 32], DataType.FP32)
+        >>> # With explicit MemRef
+        >>> tile = create_tile([32, 32], DataType.FP32, target_memory=1,
+        ...                    addr=0x1000, size=4096, mem_id=0)
     """
     actual_span = _get_span_or_capture(span)
     shape_elements = [ConstInt(dim, DataType.UINT64, actual_span) for dim in shape]
     shape_tuple = _ir_core.MakeTuple(shape_elements, actual_span)
     kwargs: dict[str, Any] = {"dtype": dtype, "target_memory": target_memory}
+
+    # When addr is specified, add memref-related kwargs for C++ operator registry
+    if addr is not None:
+        if size is None or mem_id is None:
+            raise ValueError(
+                "When specifying addr for create_tile, both size and mem_id "
+                "must also be provided. "
+                "Example: create_tile([32, 32], FP32, addr=0x1000, size=4096, mem_id=0)"
+            )
+        kwargs["memref_addr"] = addr if isinstance(addr, int) else addr
+        kwargs["memref_size"] = size
+        kwargs["memref_id"] = mem_id
+        print(f"addr is {addr} size is {size} id is {mem_id}")
+
     return _ir_core.create_op_call("block.create_tile", [shape_tuple], kwargs, actual_span)
 
 
