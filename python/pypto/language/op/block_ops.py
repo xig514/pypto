@@ -108,25 +108,35 @@ def load(
     offsets: Union[list[Union[int, Expr]], tuple[Union[int, Expr], ...]],
     shapes: Union[list[Union[int, Expr]], tuple[Union[int, Expr], ...]],
     target_memory: int = 1,
+    dst: Optional[Tile] = None,  # 新增
 ) -> Tile:
     """Copy data from tensor to unified buffer (tile).
 
     Args:
         tensor: Source tensor
         offsets: Offsets in each dimension
-        sizes: Shape of the tile in each dimension
+        shapes: Shape of the tile in each dimension
         target_memory: Target memory space (1=UB default, 2=L1)
+        dst: Optional destination tile created via create_tile().
+             When provided, the load writes directly into dst's physical
+             buffer at the address specified during create_tile().
+             This enables explicit buffer reuse and double-buffering patterns.
 
     Returns:
-        Tile wrapping the load operation
+        Tile wrapping the load operation. If dst is provided, returns a Tile
+        backed by the same physical buffer as dst.
 
     Example:
-        >>> # 2D load
-        >>> tile = load(tensor, offsets=[0, 0], shapes=[32, 32])
-        >>> # 3D load
-        >>> tile = load(tensor, offsets=[0, 0, 0], shapes=[8, 16, 32])
+        >>> # 自动分配（原有用法）
+        >>> tile = pl.load(tensor, offsets=[0, 0], shapes=[64, 128])
+        
+        >>> # 显式地址（新用法）
+        >>> buf = pl.block.create_tile([64, 128], pl.FP16, target_memory=1,
+        ...                            addr=0x0, size=16384, mem_id=0)
+        >>> tile = pl.load(tensor, offsets=[0, 0], shapes=[64, 128], dst=buf)
     """
-    call_expr = _ir_ops.load(tensor.unwrap(), offsets, shapes, target_memory)
+    dst_expr = dst.unwrap() if dst is not None else None
+    call_expr = _ir_ops.load(tensor.unwrap(), offsets, shapes, target_memory, dst=dst_expr)
     return Tile(expr=call_expr)
 
 
