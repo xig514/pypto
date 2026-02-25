@@ -63,6 +63,15 @@ TypePtr DeduceBlockGetBlockIdxType(const std::vector<ExprPtr>& args,
   return std::make_shared<ScalarType>(DataType::UINT64);
 }
 
+
+TypePtr DeduceBlockLoadIntoType(const std::vector<ExprPtr>& args,
+                            const std::vector<std::pair<std::string, std::any>>& kwargs,
+                            const std::string& op_name) {
+  CHECK(args.size() == 4) << "The operator " << op_name
+                          << " requires 3 arguments (tensor, offsets, shapes), but got " << args.size();
+  return std::make_shared<ScalarType>(DataType::UINT64);
+}
+
 TypePtr DeduceBlockLoadType(const std::vector<ExprPtr>& args,
                             const std::vector<std::pair<std::string, std::any>>& kwargs,
                             const std::string& op_name) {
@@ -281,6 +290,19 @@ REGISTER_OP("block.load")
       return DeduceBlockLoadType(args, kwargs, "block.load");
     });
 
+REGISTER_OP("block.load_into")
+  .set_op_category("BlockOp")
+  .set_description("Copy data from tensor to unified buffer (tile)")
+  .add_argument("tile", "dst tile (TileType)")
+  .add_argument("tensor", "Source tensor (TensorType)")
+  .add_argument("offsets", "Offsets in each dimension (TupleType of ScalarType)")
+  .add_argument("shapes", "Shape of tile in each dimension (TupleType of ScalarType)")
+  .set_attr<int>("target_memory")
+  .f_deduce_type([](const std::vector<ExprPtr>& args,
+                    const std::vector<std::pair<std::string, std::any>>& kwargs) {
+    return DeduceBlockLoadIntoType(args, kwargs, "block.load_into");
+  });
+    
 REGISTER_OP("block.store")
     .set_op_category("BlockOp")
     .set_description("Copy data from unified buffer (tile) to tensor")

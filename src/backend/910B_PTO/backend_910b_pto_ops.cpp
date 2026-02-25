@@ -118,6 +118,57 @@ static std::string MakeBlockLoadCodegenPTO(const CallPtr& op, codegen::CodegenBa
   return "";  // Multi-line emission
 }
 
+static std::string MakeBlockLoadIntoCodegenPTO(const CallPtr& op, codegen::CodegenBase& codegen_base) {
+  auto& codegen = dynamic_cast<codegen::PTOCodegen&>(codegen_base);
+  auto tile = As<Var>(op->args_[0]);
+  INTERNAL_CHECK(tile) << "block.store first argument must be a Var";
+  std::string tile_buf = codegen.GetVarName(tile);
+  
+  auto tensor = As<Var>(op->args_[1]);
+  INTERNAL_CHECK(tensor) << "block.load first argument must be a Var";
+
+  // Extract offsets tuple
+  auto offsets_tuple = As<ir::MakeTuple>(op->args_[2]);
+  INTERNAL_CHECK(offsets_tuple) << "block.load second argument must be a tuple (offsets)";
+
+  // Extract shapes tuple
+  auto shapes_tuple = As<ir::MakeTuple>(op->args_[3]);
+  INTERNAL_CHECK(shapes_tuple) << "block.load third argument must be a tuple (shapes)";
+
+  // Extract 2D offset and size values from tuples
+  int64_t row_off = codegen.GetConstIntValue(offsets_tuple->elements_[0]);
+  int64_t col_off = codegen.GetConstIntValue(offsets_tuple->elements_[1]);
+  int64_t height = codegen.GetConstIntValue(shapes_tuple->elements_[0]);
+  int64_t width = codegen.GetConstIntValue(shapes_tuple->elements_[1]);
+
+  auto tensor_type = As<TensorType>(tensor->GetType());
+  INTERNAL_CHECK(tensor_type) << "block.load tensor argument must have TensorType";
+
+  std::string tensor_view = codegen.GetOrCreateTensorView(tensor);
+  std::string dtype_str = codegen.GetTypeString(tensor_type->dtype_);
+
+  std::string tile_view = codegen.NewTemp();
+  std::ostringstream subview_line;
+  subview_line << tile_view << " = pto.subview " << tensor_view;
+  subview_line << ", offsets = [" << codegen.GetIndexConstant(row_off) << ", ";
+  subview_line << codegen.GetIndexConstant(col_off) << "]";
+  subview_line << ", sizes = [" << codegen.GetIndexConstant(height) << ", ";
+  subview_line << codegen.GetIndexConstant(width) << "]";
+  subview_line << " : !pto.tensor_view<2x" << dtype_str << "> -> !pto.tile_view<";
+  subview_line << height << "x" << width << "x" << dtype_str << ">";
+  codegen.Emit(subview_line.str());
+
+  std::ostringstream tload_line;
+  tload_line << "pto.tload ins(" << tile_view;
+  tload_line << " : !pto.tile_view<" << height << "x" << width << "x" << dtype_str << ">) outs(";
+  tload_line << tile_buf << " : !pto.tile_buf<loc=ub, dtype=" << dtype_str;
+  tload_line << ", rows=" << height << ", cols=" << width;
+  tload_line << ", v_row=" << height << ", v_col=" << width;
+  tload_line << ", blayout=row_major, slayout=none_box, fractal=512, pad=0>)";
+  codegen.Emit(tload_line.str());
+  return "";  // Multi-line emission
+}
+
 // block.store: emit pto.subview + pto.tstore (same format as original IR layer codegen)
 static std::string MakeBlockStoreCodegenPTO(const CallPtr& op, codegen::CodegenBase& codegen_base) {
   auto& codegen = dynamic_cast<codegen::PTOCodegen&>(codegen_base);
@@ -246,6 +297,12 @@ REGISTER_BACKEND_OP(Backend910B_PTO, "block.load")
     .set_pipe(ir::PipeType::MTE2)
     .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
       return MakeBlockLoadCodegenPTO(op, codegen);
+    });
+
+REGISTER_BACKEND_OP(Backend910B_PTO, "block.load_into")
+    .set_pipe(ir::PipeType::MTE2)
+    .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
+      return MakeBlockLoadIntoCodegenPTO(op, codegen);
     });
 
 REGISTER_BACKEND_OP(Backend910B_PTO, "block.store")

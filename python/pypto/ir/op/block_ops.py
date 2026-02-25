@@ -83,57 +83,50 @@ def load(
     offsets: Sequence[Union[int, Expr]],
     shapes: Sequence[Union[int, Expr]],
     target_memory: int = 1,
+    dst: Optional[Expr] = None,  # 新增
     span: Optional[Span] = None,
 ) -> Call:
     """Copy data from tensor to specified memory level.
 
     Args:
         tensor: Source tensor (TensorType)
-        offsets: Offsets in each dimension (sequence of scalars)
-        shapes: Shape of the tile in each dimension (sequence of scalars)
-        target_memory: Target memory space for the output tile.
-                     1=UB (UB, default), 2=L1.
-        span: Optional source span for debugging (auto-captured if not provided)
-
+        offsets: Offsets in each dimension
+        shapes: Shape of the tile in each dimension
+        target_memory: Target memory space (1=UB default, 2=L1)
+        dst: Optional destination tile. When provided, data is loaded into
+             this existing tile's buffer. The dst tile must have been created
+             with create_tile() to have an explicit MemRef.
+             When None, a new tile is allocated by the compiler.
+        span: Optional source span
+    
     Returns:
-        Call expression that returns a TileType with the copied data
-
-    Example:
-        >>> # 2D load
-        >>> tile = load(tensor, offsets=[0, 0], shapes=[32, 32])
-        >>> # 3D load
-        >>> tile = load(tensor, offsets=[0, 0, 0], shapes=[8, 16, 32])
+        Call expression returning the destination tile (dst if provided, 
+        or a newly allocated tile)
     """
-    # Validate target_memory: only UB(1) and L1(2) are allowed for load
     if target_memory not in (1, 2):
-        raise ValueError(f"target_memory for block.load must be 1 (UB) or 2 (L1), got {target_memory}")
+        raise ValueError(...)
 
-    # Validate offsets and shapes have same length
     if len(offsets) != len(shapes):
-        raise ValueError(
-            f"offsets and shapes must have same number of dimensions, "
-            f"got {len(offsets)} offsets and {len(shapes)} shapes"
-        )
-
-    if len(offsets) == 0:
-        raise ValueError("offsets and shapes must have at least one dimension")
+        raise ValueError(...)
 
     actual_span = _get_span_or_capture(span)
 
-    # Convert offsets to MakeTuple
     offset_elements = [_normalize_expr(off, actual_span, int_dtype=DataType.INT32) for off in offsets]
     offsets_tuple = _ir_core.MakeTuple(offset_elements, actual_span)
 
-    # Convert shapes to MakeTuple
-    shape_elements = [_normalize_expr(shape, actual_span, int_dtype=DataType.INT32) for shape in shapes]
+    shape_elements = [_normalize_expr(s, actual_span, int_dtype=DataType.INT32) for s in shapes]
     shapes_tuple = _ir_core.MakeTuple(shape_elements, actual_span)
 
-    args = [tensor, offsets_tuple, shapes_tuple]
-
-    # Build kwargs dict for attributes
     kwargs: dict[str, Any] = {"target_memory": target_memory}
 
-    return _ir_core.create_op_call("block.load", args, kwargs, actual_span)
+    if dst is not None:
+        # dst模式：把dst作为第一个参数，语义是"写入已有buffer"
+        args = [dst, tensor, offsets_tuple, shapes_tuple]
+        return _ir_core.create_op_call("block.load_into", args, kwargs, actual_span)
+    else:
+        # 原有模式：编译器分配新buffer
+        args = [tensor, offsets_tuple, shapes_tuple]
+        return _ir_core.create_op_call("block.load", args, kwargs, actual_span)
 
 
 def store(
