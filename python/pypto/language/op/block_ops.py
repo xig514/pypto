@@ -14,7 +14,7 @@ that accept and return Tile types instead of raw Expr/Call objects.
 """
 
 from collections.abc import Sequence
-from typing import Literal, overload
+from typing import Literal, Optional, overload, Union 
 
 __all__ = [
     "create_tile",
@@ -114,6 +114,8 @@ def create_tile(
     shape: Sequence[IntLike],
     dtype: DataType,
     target_memory: MemorySpace = MemorySpace.Vec,
+    addr: Optional[Union[int, Expr]] = None,
+    size: Optional[int] = None,
 ) -> Tile:
     """Create a tile from a shape.
 
@@ -130,7 +132,7 @@ def create_tile(
     call_expr = _ir_ops.create_tile(
         _normalize_intlike(shape),  # type: ignore[reportArgumentType]
         dtype,
-        target_memory,
+        target_memory, addr, size
     )
     return Tile(expr=call_expr)
 

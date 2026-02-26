@@ -109,6 +109,11 @@ def kernel(
         ...     return x
     """
 
+    # Capture caller's scope so the parser can resolve names like `pl`, `plm`, etc.
+    # Must be captured here (not inside _decorator) to get the correct call-site frame.
+    caller_frame = sys._getframe(1)
+    closure_vars = {**caller_frame.f_globals, **caller_frame.f_locals}
+
     def _decorator(f: Callable) -> ir.Program:
         program_name = name if name is not None else f.__name__
 
@@ -138,6 +143,7 @@ def kernel(
                 line_offset,
                 col_offset,
                 strict_ssa=strict_ssa,
+                closure_vars=closure_vars,
             )
 
             try:

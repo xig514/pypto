@@ -481,6 +481,16 @@ static const bool kSimpleOpsRegistered = [] {
 // Operations with custom codegen logic
 // ============================================================================
 
+// block.create_tile is a no-op in codegen — tile declarations are emitted in
+// the function prologue by the codegen framework when it processes TileType vars.
+REGISTER_BACKEND_OP(Backend910B_PTO, "block.create_tile")
+    .set_pipe(ir::PipeType::MTE2)
+    .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) -> std::string {
+      (void)op;
+      (void)codegen;
+      return "!!!!create_tile!!!!";
+    });
+
 REGISTER_BACKEND_OP(Backend910B_PTO, "block.load")
     .set_pipe(ir::PipeType::MTE2)
     .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {

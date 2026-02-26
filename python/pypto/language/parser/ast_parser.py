@@ -1317,21 +1317,25 @@ class ASTParser:
             attrs.insert(0, node.id)
 
         # pl.tensor.{operation} (3-segment)
-        if len(attrs) >= 3 and attrs[0] == "pl" and attrs[1] == "tensor":
+        if len(attrs) >= 3 and attrs[0] in ("pl", "plm") and attrs[1] == "tensor":
             op_name = attrs[2]
             return self._parse_tensor_op(op_name, call)
 
         # pl.block.{operation} (3-segment)
-        if len(attrs) >= 3 and attrs[0] == "pl" and attrs[1] == "block":
+        if len(attrs) >= 3 and attrs[0] in ("pl", "plm") and attrs[1] == "block":
             op_name = attrs[2]
             return self._parse_block_op(op_name, call)
 
         # pl.const(value, dtype) — typed constant literal
-        if len(attrs) >= 2 and attrs[0] == "pl" and attrs[1] == "const":
+        if len(attrs) >= 2 and attrs[0] in ("pl", "plm") and attrs[1] == "const":
             return self._parse_typed_constant(call)
 
+        # plm.{operation} (2-segment) — manual (non-SSA) ops
+        if len(attrs) == 2 and attrs[0] == "plm" and attrs[1] != "const":
+            return self._parse_manual_op(attrs[1], call)
+
         # pl.{operation} (2-segment, unified dispatch or promoted ops)
-        if len(attrs) >= 2 and attrs[0] == "pl" and attrs[1] not in ("tensor", "block"):
+        if len(attrs) >= 2 and attrs[0] in ("pl", "plm") and attrs[1] not in ("tensor", "block"):
             op_name = attrs[1]
             return self._parse_unified_op(op_name, call)
 
@@ -1352,27 +1356,32 @@ class ASTParser:
         Returns:
             Dictionary of keyword argument names to values
         """
-        kwargs = {}
-        for keyword in call.keywords:
-            key = keyword.arg
-            value = keyword.value
+        return {kw.arg: self._resolve_single_kwarg(kw.arg, kw.value) for kw in call.keywords}
 
-            # Handle dtype specially
-            if key == "dtype":
-                kwargs[key] = self.type_resolver.resolve_dtype(value)
-            elif isinstance(value, ast.Constant):
-                kwargs[key] = value.value
-            elif isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
-                kwargs[key] = self._resolve_unary_kwarg(value)
-            elif isinstance(value, ast.Name):
-                kwargs[key] = self._resolve_name_kwarg(value)
-            elif isinstance(value, ast.Attribute):
-                kwargs[key] = self._resolve_attribute_kwarg(value)
-            elif isinstance(value, ast.List):
-                kwargs[key] = self._resolve_list_kwarg(value)
-            else:
-                kwargs[key] = self.parse_expression(value)
-        return kwargs
+    def _resolve_single_kwarg(self, key: str, value: ast.expr) -> Any:
+        """Resolve a single keyword argument value to a Python or IR value.
+
+        Args:
+            key: Keyword argument name
+            value: AST expression for the value
+
+        Returns:
+            Resolved Python or IR value
+        """
+        if key == "dtype":
+            return self.type_resolver.resolve_dtype(value)
+        elif isinstance(value, ast.Constant):
+            return value.value
+        elif isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
+            return self._resolve_unary_kwarg(value)
+        elif isinstance(value, ast.Name):
+            return self._resolve_name_kwarg(value)
+        elif isinstance(value, ast.Attribute):
+            return self._resolve_attribute_kwarg(value)
+        elif isinstance(value, ast.List):
+            return self._resolve_list_kwarg(value)
+        else:
+            return self.parse_expression(value)
 
     def _resolve_unary_kwarg(self, value: ast.UnaryOp) -> Any:
         """Resolve a unary op kwarg value (e.g., -1)."""
@@ -1458,6 +1467,68 @@ class ASTParser:
             span=self.span_tracker.get_span(call),
             hint=f"Check if '{op_name}' is a valid block operation",
         )
+
+    # Manual ops that share block SSA semantics (no explicit output tile arg).
+    # These are routed to _parse_block_op directly.
+    _MANUAL_AS_BLOCK_OPS: frozenset[str] = frozenset({
+        "create_tile",  # allocation — same IR op as SSA
+        "store",        # writes to tensor, returns result
+        "l0c_store",    # writes L0C tile to tensor
+    })
+
+    def _parse_manual_op(self, op_name: str, call: ast.Call) -> ir.Expr:
+        """Parse a manual (non-SSA) operation call: plm.{op_name}(..., dst=tile).
+
+        Manual ops differ from block ops in two ways:
+          1. They receive a pre-allocated output tile via ``dst=`` or ``out=`` kwarg.
+          2. The dst variable is rebound in scope to the returned SSA value so that
+             subsequent reads of that variable see the updated data.
+
+        Args:
+            op_name: Name of the manual operation (without ``manual.`` prefix).
+            call: Call AST node.
+
+        Returns:
+            IR expression for the manual op call.
+        """
+        span = self.span_tracker.get_span(call)
+
+        # Ops with SSA block semantics — no explicit output tile needed.
+        if op_name in self._MANUAL_AS_BLOCK_OPS:
+            return self._parse_block_op(op_name, call)
+
+        # All other manual ops require an explicit output tile via dst=/out=.
+        args = [self.parse_expression(arg) for arg in call.args]
+
+        dst_var_name: str | None = None
+        dst_expr: ir.Expr | None = None
+        other_kwargs: dict[str, Any] = {}
+
+        for keyword in call.keywords:
+            if keyword.arg in ("dst", "out"):
+                if isinstance(keyword.value, ast.Name):
+                    dst_var_name = keyword.value.id
+                dst_expr = self.parse_expression(keyword.value)
+            else:
+                other_kwargs[keyword.arg] = self._resolve_single_kwarg(keyword.arg, keyword.value)
+
+        if dst_expr is None:
+            raise InvalidOperationError(
+                f"Manual op 'plm.{op_name}' requires a 'dst' or 'out' keyword argument "
+                "specifying the pre-allocated output tile",
+                span=span,
+                hint=f"Use: plm.{op_name}(..., dst=my_tile)",
+            )
+
+        result_expr = ir.create_op_call(
+            f"manual.{op_name}", args + [dst_expr], other_kwargs, span
+        )
+
+        # Rebind the dst variable in scope so subsequent uses see the updated SSA value.
+        if dst_var_name is not None:
+            self.scope_manager.define_var(dst_var_name, result_expr, allow_redef=True)
+
+        return result_expr
 
     # Maps unified op names to the scalar variant for block ops.
     # Only binary arithmetic ops have scalar auto-dispatch.

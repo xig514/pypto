@@ -102,6 +102,10 @@ set(PYPTO_SOURCES
     src/ir/op/block_ops/reduction.cpp
     src/ir/op/block_ops/transform.cpp
     src/ir/op/block_ops/unary.cpp
+    src/ir/op/manual_ops/elementwise.cpp
+    src/ir/op/manual_ops/matmul.cpp
+    src/ir/op/manual_ops/memory.cpp
+    src/ir/op/manual_ops/reduction.cpp
     src/ir/op/sync_ops/sync.cpp
     src/ir/op/tensor_ops/elementwise.cpp
     src/ir/op/tensor_ops/matmul.cpp
@@ -166,6 +170,7 @@ set(PYPTO_SOURCES
     src/backend/910B_CCE/backend_910b_cce_ops.cpp
     src/backend/910B_PTO/backend_910b_pto.cpp
     src/backend/910B_PTO/backend_910b_pto_ops.cpp
+    src/backend/910B_PTO/backend_910b_pto_manual_ops.cpp
     src/backend/common/backend.cpp
     src/backend/common/backend_config.cpp
     src/backend/common/backend_registry.cpp

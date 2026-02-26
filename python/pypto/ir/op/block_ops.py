@@ -15,7 +15,7 @@ unary operations, and reduction operations.
 """
 
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Sequence, Union
 
 from pypto.pypto_core import DataType
 from pypto.pypto_core import ir as _ir_core
@@ -52,14 +52,18 @@ def create_tile(
     shape: Sequence[int] | _ir_core.MakeTuple,
     dtype: DataType,
     target_memory: MemorySpace = MemorySpace.Vec,
+    addr: Optional[Union[int, Expr]] = None,
+    size: Optional[int] = None,
     span: Span | None = None,
 ) -> Call:
     """Create a tile from a shape.
-
     Args:
         shape: Shape of the tile, or a MakeTuple
         dtype: Data type of the tile
         target_memory: Target memory space (MemorySpace.Vec, .Mat, .Left, .Right)
+        addr: Optional memory address (int or Expr). When provided with size，
+              creates a tile with explicit MemRef.
+        size: Optional memory size in bytes. Required when addr is provided.
         span: Optional source span for debugging (auto-captured if not provided)
 
     Returns:
@@ -68,6 +72,19 @@ def create_tile(
     actual_span = _get_span_or_capture(span)
     shape_tuple = _to_make_tuple(shape, actual_span)
     kwargs: dict[str, Any] = {"dtype": dtype, "target_memory": target_memory}
+    if addr is not None:
+        if size is None:
+            raise ValueError(
+                "When specifying addr for create_tile, both size and mem_id "
+                "must also be provided. "
+                "Example: create_tile([32, 32], FP32, target_memory=MemorySpace.UB, addr=0x1000, size=4096)"
+            )
+        global mem_id
+        mem_id = mem_id + 1 if 'mem_id' in globals() else 0
+        kwargs["memref_addr"] = addr if isinstance(addr, int) else addr
+        kwargs["memref_size"] = size
+        kwargs["memref_id"] = mem_id
+        print(f"addr is {addr} size is {size} id is {mem_id}")
     return _ir_core.create_op_call("block.create_tile", [shape_tuple], kwargs, actual_span)
 
 

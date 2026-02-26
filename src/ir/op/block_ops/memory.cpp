@@ -331,6 +331,9 @@ REGISTER_OP("block.create_tile")
     .add_argument("shape", "Shape dimensions (TupleType of ScalarType(INT64))")
     .set_attr<DataType>("dtype")
     .set_attr<MemorySpace>("target_memory")
+    .set_attr<int>("memref_addr")
+    .set_attr<int>("memref_size")
+    .set_attr<int>("memref_id")
     .f_deduce_type([](const std::vector<ExprPtr>& args,
                       const std::vector<std::pair<std::string, std::any>>& kwargs) {
       return DeduceBlockCreateTileType(args, kwargs, "block.create_tile");
