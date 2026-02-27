@@ -1500,14 +1500,11 @@ class ASTParser:
         # All other manual ops require an explicit output tile via dst=/out=.
         args = [self.parse_expression(arg) for arg in call.args]
 
-        dst_var_name: str | None = None
         dst_expr: ir.Expr | None = None
         other_kwargs: dict[str, Any] = {}
 
         for keyword in call.keywords:
             if keyword.arg in ("dst", "out"):
-                if isinstance(keyword.value, ast.Name):
-                    dst_var_name = keyword.value.id
                 dst_expr = self.parse_expression(keyword.value)
             else:
                 other_kwargs[keyword.arg] = self._resolve_single_kwarg(keyword.arg, keyword.value)
@@ -1524,9 +1521,12 @@ class ASTParser:
             f"manual.{op_name}", args + [dst_expr], other_kwargs, span
         )
 
-        # Rebind the dst variable in scope so subsequent uses see the updated SSA value.
-        if dst_var_name is not None:
-            self.scope_manager.define_var(dst_var_name, result_expr, allow_redef=True)
+        # Do NOT rebind the dst variable in scope.  The tile Var created by
+        # create_tile remains the canonical buffer handle for the whole kernel;
+        # manual ops (load, add, …) are side-effects on that buffer.  Re-binding
+        # to the Call node would cause subsequent uses of the variable to resolve
+        # to a Call rather than a Var, breaking GetExprAsCode lookups in the
+        # PTO backend (which expects Var nodes for tile arguments).
 
         return result_expr
 

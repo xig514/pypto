@@ -342,8 +342,17 @@ void PTOCodegen::EmitAllocTiles(const ir::FunctionPtr& func, const std::vector<i
   (void)func;
   for (const auto& memref : memrefs) {
     std::string tile_buf = memref_to_mlir_[memref.get()];
-    stream_ << GetIndent() << tile_buf << " = pto.alloc_tile : " << GetTileBufTypeString(memref.get())
-            << "\n";
+    stream_ << GetIndent() << tile_buf << " = pto.alloc_tile";
+    // Emit base_addr when the MemRef carries an explicit non-zero address
+    // (i.e., set by the user via block.create_tile addr= kwarg).
+    if (memref->addr_) {
+      if (auto const_addr = As<ir::ConstInt>(memref->addr_)) {
+        if (const_addr->value_ != 0) {
+          stream_ << " base_addr = " << const_addr->value_;
+        }
+      }
+    }
+    stream_ << " : " << GetTileBufTypeString(memref.get()) << "\n";
   }
 }
 

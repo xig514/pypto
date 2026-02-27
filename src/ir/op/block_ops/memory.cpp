@@ -265,7 +265,29 @@ TypePtr DeduceBlockCreateTileType(const std::vector<ExprPtr>& args,
 
   CHECK(!tile_shape.empty()) << "The operator " << op_name << " requires non-empty shape";
 
-  // Return TileType with the static shape and dtype
+  // If explicit memref kwargs are provided (addr + size + id), attach a MemRef to the TileType.
+  // This allows the PTO codegen to emit pto.alloc_tile with base_addr directly from the IR,
+  // without requiring the init_memref pass.
+  MemorySpace target_memory =
+      GetKwarg<MemorySpace>(kwargs, "target_memory", std::optional<MemorySpace>(MemorySpace::UB));
+
+  bool has_memref = false;
+  for (const auto& [k, v] : kwargs) {
+    if (k == "memref_id") {
+      has_memref = true;
+      break;
+    }
+  }
+  if (has_memref) {
+    int64_t addr_val = GetKwarg<int>(kwargs, "memref_addr");
+    int64_t size_val = GetKwarg<int>(kwargs, "memref_size");
+    uint64_t id_val  = static_cast<uint64_t>(GetKwarg<int>(kwargs, "memref_id"));
+    auto addr_expr = std::make_shared<ConstInt>(addr_val, DataType::INDEX, Span::unknown());
+    MemRefPtr memref = std::make_shared<MemRef>(target_memory, addr_expr,
+                                                static_cast<uint64_t>(size_val), id_val);
+    return std::make_shared<TileType>(tile_shape, dtype, std::optional<MemRefPtr>(memref));
+  }
+
   return std::make_shared<TileType>(tile_shape, dtype);
 }
 
