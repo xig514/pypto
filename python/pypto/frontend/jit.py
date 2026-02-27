@@ -194,7 +194,7 @@ def jit(target=None, optimize: bool = True, cache: bool = True,
         
         return wrapper
     
-    if len(dargs) == 1 and callable(dargs[0]):
-        return decorator(dargs[0])
+    if callable(target):
+        return decorator(target)
     else:
         return decorator

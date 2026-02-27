@@ -111,6 +111,10 @@ def neg_kernel(
 # ---------------------------------------------------------------------------
 # Test functions (run with: python test_kernel.py)
 # ---------------------------------------------------------------------------
+@fe.jit()
+def test_load_kernel_with_jit():
+    compiled_kernel = fe.compile(load_kernel)
+    return
 
 def test_load_kernel():
     """Two loads: verify alloc_tile and tload patterns."""
@@ -169,6 +173,7 @@ def test_neg_kernel():
 
 
 if __name__ == "__main__":
+    test_load_kernel_with_jit()
     test_load_kernel()
     test_add_kernel()
     test_mul_kernel()
