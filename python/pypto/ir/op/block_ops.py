@@ -54,6 +54,11 @@ def create_tile(
     target_memory: MemorySpace = MemorySpace.Vec,
     addr: Optional[Union[int, Expr]] = None,
     size: Optional[int] = None,
+    valid_shape: Optional[Sequence[int] | _ir_core.MakeTuple] = None,
+    blayout: Optional[int] = None,
+    slayout: Optional[int] = None,
+    fractal: Optional[int] = None,
+    pad: Optional[int] = None,
     span: Span | None = None,
 ) -> Call:
     """Create a tile from a shape.
@@ -64,6 +69,11 @@ def create_tile(
         addr: Optional memory address (int or Expr). When provided with size，
               creates a tile with explicit MemRef.
         size: Optional memory size in bytes. Required when addr is provided.
+        valid_shape: Valid shape dimensions
+        blayout: Block layout (0=none_box, 1=row_major, 2=col_major)
+        slayout: Scatter layout (0=none_box, 1=row_major, 2=col_major)
+        fractal: Fractal size
+        pad: Pad mode (0=null, 1=zero, 2=max, 3=min)
         span: Optional source span for debugging (auto-captured if not provided)
 
     Returns:
@@ -71,7 +81,17 @@ def create_tile(
     """
     actual_span = _get_span_or_capture(span)
     shape_tuple = _to_make_tuple(shape, actual_span)
-    kwargs: dict[str, Any] = {"dtype": dtype, "target_memory": target_memory}
+    valid_shape_tuple = _to_make_tuple(valid_shape, actual_span) if valid_shape is not None else _ir_core.MakeTuple([], actual_span)
+    args = [shape_tuple, valid_shape_tuple]
+    kwargs: dict[str, Any] = {
+        "dtype": dtype,
+        "target_memory": target_memory,
+        "blayout": blayout,
+        "slayout": slayout,
+        "fractal": fractal,
+        "pad": pad,
+    }
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
     if addr is not None:
         if size is None:
             raise ValueError(
@@ -85,7 +105,7 @@ def create_tile(
         kwargs["memref_size"] = size
         kwargs["memref_id"] = mem_id
         print(f"addr is {addr} size is {size} id is {mem_id}")
-    return _ir_core.create_op_call("block.create_tile", [shape_tuple], kwargs, actual_span)
+    return _ir_core.create_op_call("block.create_tile", args, kwargs, actual_span)
 
 
 def load(

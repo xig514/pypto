@@ -532,6 +532,8 @@ std::string PTOCodegen::GetTileBufTypeString(const ir::MemRef* memref) const {
   std::string dtype_str = "f32";
   int64_t rows = 32;
   int64_t cols = 32;
+  int64_t v_row = 32;  
+  int64_t v_col = 32;  
 
   // Extract blayout, slayout, fractal, pad from TileView if available, otherwise use defaults
   ir::TileLayout blayout = ir::TileLayout::row_major;
@@ -552,12 +554,26 @@ std::string PTOCodegen::GetTileBufTypeString(const ir::MemRef* memref) const {
         cols = c0->value_;
       }
     }
+    // default v_row/v_col equals rows/cols 
+    v_row = rows;
+    v_col = cols;
+    
     if (tile_type->tile_view_.has_value()) {
       const auto& tv = *tile_type->tile_view_;
       blayout = tv.blayout;
       slayout = tv.slayout;
       fractal = tv.fractal;
       pad = tv.pad;
+
+      if (tv.valid_shape.size() >= 2) {
+        if (auto v0 = As<ir::ConstInt>(tv.valid_shape[0])) v_row = v0->value_;
+        if (auto v1 = As<ir::ConstInt>(tv.valid_shape[1])) v_col = v1->value_;
+      } else if (tv.valid_shape.size() == 1) {
+        if (auto v0 = As<ir::ConstInt>(tv.valid_shape[0])) {
+          v_row = 1;
+          v_col = v0->value_;
+        }
+      }
     }
   }
 
@@ -576,7 +592,7 @@ std::string PTOCodegen::GetTileBufTypeString(const ir::MemRef* memref) const {
   std::ostringstream oss;
   oss << "!pto.tile_buf<loc=" << loc << ", dtype=" << dtype_str;
   oss << ", rows=" << rows << ", cols=" << cols;
-  oss << ", v_row=" << rows << ", v_col=" << cols;
+  oss << ", v_row=" << v_row << ", v_col=" << v_col; 
   oss << ", blayout=" << layout_to_str(blayout);
   oss << ", slayout=" << layout_to_str(slayout);
   oss << ", fractal=" << fractal;

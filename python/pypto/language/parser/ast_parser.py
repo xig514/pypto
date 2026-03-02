@@ -342,6 +342,20 @@ class ASTParser:
                 var_name = target.id
                 span = self.span_tracker.get_span(stmt)
 
+                # Check if this is a TileType assignment
+                if isinstance(stmt.value, ast.Call):
+                    func = stmt.value.func
+                    # TileType(...)
+                    if isinstance(func, ast.Name) and func.id == "TileType":
+                        tile_type = self._parse_tile_type_call(stmt.value)
+                        self.scope_manager.define_python_var(var_name, tile_type, span=span)
+                        return
+                    # plm.TileType(...)
+                    if isinstance(func, ast.Attribute) and func.attr == "TileType":
+                        tile_type = self._parse_tile_type_call(stmt.value)
+                        self.scope_manager.define_python_var(var_name, tile_type, span=span)
+                        return
+
                 # Check if this is a yield assignment: var = pl.yield_(...)
                 if isinstance(stmt.value, ast.Call):
                     func = stmt.value.func
@@ -1107,7 +1121,7 @@ class ASTParser:
                 hint="Use supported expressions like variables, constants, operations, or function calls",
             )
 
-    def parse_name(self, name: ast.Name) -> ir.Expr:
+    def parse_name(self, name: ast.Name) -> ir.Expr | Any:
         """Parse variable name reference.
 
         Resolves names by checking the DSL scope first, then falling back
@@ -1120,6 +1134,11 @@ class ASTParser:
             IR expression (Var from scope, or constant/tuple from closure)
         """
         var_name = name.id
+        # Check if it's a Python variable (non-IR value like TileType)
+        python_var = self.scope_manager.get_python_var(var_name)
+        if python_var is not None:
+            return python_var
+
         var = self.scope_manager.lookup_var(var_name)
 
         if var is not None:
@@ -1270,6 +1289,10 @@ class ASTParser:
         """
         func = call.func
 
+        # Handle TileType(...) - type descriptor, not an operation
+        if isinstance(func, ast.Name) and func.id == "TileType":
+            return self._parse_tile_type_call(call)
+
         # Handle pl.yield_() specially
         if isinstance(func, ast.Attribute) and func.attr == "yield_":
             return self.parse_yield_call(call)
@@ -1393,12 +1416,16 @@ class ASTParser:
         if len(attrs) >= 2 and attrs[0] in ("pl", "plm") and attrs[1] == "const":
             return self._parse_typed_constant(call)
 
+        # plm.TileType(...) - type descriptor, not an operation
+        if len(attrs) == 2 and attrs[0] == "plm" and attrs[1] == "TileType":
+            return self._parse_tile_type_call(call)
+
         # plm.{operation} (2-segment) — manual (non-SSA) ops
-        if len(attrs) == 2 and attrs[0] == "plm" and attrs[1] != "const":
+        if len(attrs) == 2 and attrs[0] == "plm" and attrs[1] not in ("const", "TileType"):
             return self._parse_manual_op(attrs[1], call)
 
         # pl.{operation} (2-segment, unified dispatch or promoted ops)
-        if len(attrs) >= 2 and attrs[0] in ("pl", "plm") and attrs[1] not in ("tensor", "block"):
+        if len(attrs) >= 2 and attrs[0] in ("pl", "plm") and attrs[1] not in ("tensor", "block", "TileType"):
             op_name = attrs[1]
             return self._parse_unified_op(op_name, call)
 
@@ -1407,6 +1434,16 @@ class ASTParser:
             span=self.span_tracker.get_span(call),
             hint="Use pl.*, pl.tensor.*, or pl.block.* operations",
         )
+
+    def _parse_tile_type_call(self, call: ast.Call) -> Any:
+        """Parse TileType(...) as a dataclass instantiation."""
+        from pypto.language.manual.op.manual_ops import TileType
+
+        kwargs = {}
+        for kw in call.keywords:
+            kwargs[kw.arg] = self._resolve_single_kwarg(kw.arg, kw.value)
+
+        return TileType(**kwargs)
 
     def _parse_op_kwargs(self, call: ast.Call) -> dict[str, Any]:
         """Parse keyword arguments for an operation call.
@@ -1518,6 +1555,28 @@ class ASTParser:
         """
         args = [self.parse_expression(arg) for arg in call.args]
         kwargs = self._parse_op_kwargs(call)
+
+        # Special handling for create_tile with TileType
+        if op_name == "create_tile":
+            from pypto.language.manual.op.manual_ops import TileType
+            if len(args) >= 1 and isinstance(args[0], TileType):
+                tile_type = args[0]
+                # Extract parameters from TileType
+                kwargs.setdefault("shape", tile_type.shape)
+                kwargs.setdefault("dtype", tile_type.dtype)
+                kwargs.setdefault("target_memory", tile_type.target_memory)
+                if tile_type.valid_shape is not None:
+                    kwargs.setdefault("valid_shape", tile_type.valid_shape)
+                if tile_type.blayout is not None:
+                    kwargs.setdefault("blayout", tile_type.blayout)
+                if tile_type.slayout is not None:
+                    kwargs.setdefault("slayout", tile_type.slayout)
+                if tile_type.fractal is not None:
+                    kwargs.setdefault("fractal", tile_type.fractal)
+                if tile_type.pad is not None:
+                    kwargs.setdefault("pad", tile_type.pad)
+                # Remove TileType from args, keep addr and size
+                args = args[1:]
 
         # Call the appropriate block operation
         if hasattr(ir_op.block, op_name):

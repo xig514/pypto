@@ -30,7 +30,7 @@ Typical usage::
 
 from collections.abc import Sequence
 from typing import Literal, Optional, Sequence, Union
-
+from dataclasses import dataclass
 from pypto.ir.op import block_ops as _ir_block_ops
 from pypto.ir.utils import _to_make_tuple
 from pypto.pypto_core import DataType
@@ -39,6 +39,35 @@ from pypto.pypto_core.ir import Expr, MemorySpace, Span
 
 from ...typing import Scalar, Tensor, Tile
 
+# ---------------------------------------------------------------------------
+# TileType descriptor
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TileType:
+    """Tile type descriptor containing shape, dtype, and TileView parameters.
+
+    This class encapsulates all the type information for a tile, which can then
+    be used to create an actual tile with memory allocation via create_tile().
+
+    Args:
+        shape: Tile shape dimensions.
+        dtype: Element data type.
+        target_memory: Memory space for the tile (default Vec).
+        valid_shape: Valid shape dimensions (optional).
+        blayout: Block layout (0=none_box, 1=row_major, 2=col_major, optional).
+        slayout: Scatter layout (0=none_box, 1=row_major, 2=col_major, optional).
+        fractal: Fractal size (optional).
+        pad: Pad mode (0=null, 1=zero, 2=max, 3=min, optional).
+    """
+    shape: Sequence[int] | _ir_core.MakeTuple
+    dtype: DataType
+    target_memory: MemorySpace = MemorySpace.Vec
+    valid_shape: Optional[Sequence[int]] = None
+    blayout: Optional[int] = None
+    slayout: Optional[int] = None
+    fractal: Optional[int] = None
+    pad: Optional[int] = None
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -63,11 +92,9 @@ def _op(name: str, ins: list, out: Tile, **kwargs) -> None:
 # Allocation / creation
 # ---------------------------------------------------------------------------
 def create_tile(
-    shape: list[int],
-    dtype: DataType,
-    target_memory: MemorySpace = MemorySpace.Vec,
-    addr: Optional[Union[int, Expr]] = None,
-    size: Optional[int] = None,
+    tile_type: TileType,
+    addr: int | Expr,  
+    size: int,      
 ) -> Tile:
     """Allocate a tile buffer.
 
@@ -75,16 +102,23 @@ def create_tile(
     must subsequently be passed as the ``out`` argument to load/compute ops.
 
     Args:
-        shape: Tile shape.
-        dtype: Element data type.
-        target_memory: Memory space for the tile (default UB).
-        addr: Optional memory address (int or Expr)
-        size: Optional memory size in bytes
+        tile_type: Tile type descriptor containing shape, dtype, and TileView params.
+        addr: Memory address (int or Expr). Required for manual mode.
+        size: Memory size in bytes. Required for manual mode.
 
     Returns:
         Tile wrapping the allocation expression.
     """
-    return Tile(expr=_ir_block_ops.create_tile(shape, dtype, target_memory, addr, size))
+    return Tile(expr=_ir_block_ops.create_tile(shape=tile_type.shape,
+        dtype=tile_type.dtype,
+        target_memory=tile_type.target_memory,
+        addr=addr,
+        size=size,
+        valid_shape=tile_type.valid_shape,
+        blayout=tile_type.blayout,
+        slayout=tile_type.slayout,
+        fractal=tile_type.fractal,
+        pad=tile_type.pad))
 
 
 # ---------------------------------------------------------------------------

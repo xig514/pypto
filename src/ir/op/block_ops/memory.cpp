@@ -236,35 +236,62 @@ TypePtr DeduceBlockCreateTileType(const std::vector<ExprPtr>& args,
                                   const std::string& op_name) {
   // create_tile signature: (shape)
   // TileType requires static compile-time constant shapes
-  CHECK(args.size() == 1) << "The operator " << op_name << " requires exactly 1 argument, but got "
+  CHECK(args.size() == 2) << "The operator " << op_name << " requires exactly 2 argument, but got "
                           << args.size();
 
   // Extract dtype attribute
   DataType dtype = GetKwarg<DataType>(kwargs, "dtype");
 
   // First argument must be MakeTuple with static ConstInt elements
-  auto make_tuple = As<MakeTuple>(args[0]);
-  CHECK(make_tuple)
+  auto shape_tuple = As<MakeTuple>(args[0]);
+  CHECK(shape_tuple)
       << "The operator " << op_name
       << " requires first argument to be a MakeTuple expression with static shape values, but got "
       << args[0]->TypeName();
 
   // Validate all elements are ConstInt (static compile-time constants)
   std::vector<ExprPtr> tile_shape;
-  tile_shape.reserve(make_tuple->elements_.size());
+  tile_shape.reserve(shape_tuple->elements_.size());
 
-  for (size_t i = 0; i < make_tuple->elements_.size(); ++i) {
-    auto const_int = As<ConstInt>(make_tuple->elements_[i]);
+  for (size_t i = 0; i < shape_tuple->elements_.size(); ++i) {
+    auto const_int = As<ConstInt>(shape_tuple->elements_[i]);
     CHECK(const_int) << "The operator " << op_name << " shape element " << i
                      << " must be a compile-time constant (ConstInt), but got "
-                     << make_tuple->elements_[i]->TypeName();
+                     << shape_tuple->elements_[i]->TypeName();
     CHECK(const_int->value_ > 0) << "The operator " << op_name << " shape element " << i
                                  << " must be positive, got " << const_int->value_;
-    tile_shape.push_back(make_tuple->elements_[i]);
+    tile_shape.push_back(shape_tuple->elements_[i]);
   }
 
   CHECK(!tile_shape.empty()) << "The operator " << op_name << " requires non-empty shape";
 
+  TileView tile_view;
+
+  auto valid_shape_tuple = As<MakeTuple>(args[1]);
+  if (valid_shape_tuple) tile_view.valid_shape = valid_shape_tuple->elements_;
+
+  int blayout = GetKwarg<int>(kwargs, "blayout", -1);
+  if (blayout >= 0) {
+    tile_view.blayout = (blayout == 0) ? TileLayout::none_box : 
+                         (blayout == 2) ? TileLayout::col_major : TileLayout::row_major;
+  }
+
+  int slayout = GetKwarg<int>(kwargs, "slayout", -1);
+  if (slayout >= 0) {
+    tile_view.slayout = (slayout == 0) ? TileLayout::none_box : 
+                         (slayout == 2) ? TileLayout::col_major : TileLayout::row_major;
+  }
+
+  int fractal = GetKwarg<int>(kwargs, "fractal", -1);
+  if (fractal >= 0) {
+    tile_view.fractal = static_cast<uint64_t>(fractal);
+  }
+
+  int pad = GetKwarg<int>(kwargs, "pad", -1);
+  if (pad >= 0) {
+    tile_view.pad = (pad == 1) ? TilePad::zero : (pad == 2) ? TilePad::max : 
+                    (pad == 3) ? TilePad::min : TilePad::null;
+  }
   // If explicit memref kwargs are provided (addr + size + id), attach a MemRef to the TileType.
   // This allows the PTO codegen to emit pto.alloc_tile with base_addr directly from the IR,
   // without requiring the init_memref pass.
@@ -285,7 +312,7 @@ TypePtr DeduceBlockCreateTileType(const std::vector<ExprPtr>& args,
     auto addr_expr = std::make_shared<ConstInt>(addr_val, DataType::INDEX, Span::unknown());
     MemRefPtr memref = std::make_shared<MemRef>(target_memory, addr_expr,
                                                 static_cast<uint64_t>(size_val), id_val);
-    return std::make_shared<TileType>(tile_shape, dtype, std::optional<MemRefPtr>(memref));
+    return std::make_shared<TileType>(tile_shape, dtype, std::optional<MemRefPtr>(memref), tile_view);
   }
 
   return std::make_shared<TileType>(tile_shape, dtype);
@@ -351,11 +378,16 @@ REGISTER_OP("block.create_tile")
     .set_op_category("BlockOp")
     .set_description("Create a tile")
     .add_argument("shape", "Shape dimensions (TupleType of ScalarType(INT64))")
+    .add_argument("valid_shape", "Valid shape dimensions (optional, TupleType)")
     .set_attr<DataType>("dtype")
     .set_attr<MemorySpace>("target_memory")
     .set_attr<int>("memref_addr")
     .set_attr<int>("memref_size")
     .set_attr<int>("memref_id")
+    .set_attr<int>("blayout")
+    .set_attr<int>("slayout")
+    .set_attr<int>("fractal")
+    .set_attr<int>("pad")
     .f_deduce_type([](const std::vector<ExprPtr>& args,
                       const std::vector<std::pair<std::string, std::any>>& kwargs) {
       return DeduceBlockCreateTileType(args, kwargs, "block.create_tile");

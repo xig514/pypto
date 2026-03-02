@@ -16,6 +16,7 @@ correct pto.alloc_tile / pto.tload / pto.tadd / pto.tmul patterns.
 import pypto.frontend as fe
 import pypto.language as pl
 import pypto.language.manual as plm
+
 from pypto import backend
 from pypto.backend import BackendType
 from pypto.pypto_core.codegen import PTOCodegen
@@ -43,12 +44,30 @@ def load_kernel(
     a: pl.Tensor[[64, 128], pl.FP16],
     b: pl.Tensor[[64, 128], pl.FP16],
 ) -> pl.Tensor[[64, 128], pl.FP16]:
-    tile_a = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x0000, size=16384)
+    tile_type_a = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+        valid_shape=[32, 64],
+        blayout=1,
+        slayout=2,
+        fractal=2,
+        pad=1,
+    )
+    tile_a = plm.create_tile(tile_type_a, addr=0x0000, size=16384)
     plm.load(a, [0, 0], [64, 128], out=tile_a)
 
-    tile_b = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x4000, size=16384)
+    tile_type_b = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+        valid_shape=[32, 64],
+        blayout=2,
+        slayout=1,
+        fractal=2,
+        pad=1,
+    )
+    tile_b = plm.create_tile(tile_type_b, addr=0x4000, size=16384)
     plm.load(b, [0, 0], [64, 128], out=tile_b)
     return b
 
@@ -59,16 +78,28 @@ def add_kernel(
     a: pl.Tensor[[64, 128], pl.FP16],
     b: pl.Tensor[[64, 128], pl.FP16],
 ) -> pl.Tensor[[64, 128], pl.FP16]:
-    tile_a = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x0000, size=16384)
+    tile_type_a = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_a = plm.create_tile(tile_type_a, addr=0x0000, size=16384)
     plm.load(a, [0, 0], [64, 128], out=tile_a)
 
-    tile_b = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x4000, size=16384)
+    tile_type_b = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_b = plm.create_tile(tile_type_b, addr=0x4000, size=16384)
     plm.load(b, [0, 0], [64, 128], out=tile_b)
 
-    tile_c = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x8000, size=16384)
+    tile_type_c = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_c = plm.create_tile(tile_type_c, addr=0x8000, size=16384)
     plm.add(tile_a, tile_b, out=tile_c)
     return b
 
@@ -79,16 +110,28 @@ def mul_kernel(
     a: pl.Tensor[[64, 128], pl.FP16],
     b: pl.Tensor[[64, 128], pl.FP16],
 ) -> pl.Tensor[[64, 128], pl.FP16]:
-    tile_a = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x0000, size=16384)
+    tile_type_a = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_a = plm.create_tile(tile_type_a, addr=0x0000, size=16384)
     plm.load(a, [0, 0], [64, 128], out=tile_a)
 
-    tile_b = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x4000, size=16384)
+    tile_type_b = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_b = plm.create_tile(tile_type_b, addr=0x4000, size=16384)
     plm.load(b, [0, 0], [64, 128], out=tile_b)
 
-    tile_c = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x8000, size=16384)
+    tile_type_c = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_c = plm.create_tile(tile_type_c, addr=0x8000, size=16384)
     plm.mul(tile_a, tile_b, out=tile_c)
     return b
 
@@ -98,12 +141,20 @@ def mul_kernel(
 def neg_kernel(
     a: pl.Tensor[[64, 128], pl.FP16],
 ) -> pl.Tensor[[64, 128], pl.FP16]:
-    tile_a = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x0000, size=16384)
+    tile_type_a = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_a = plm.create_tile(tile_type_a, addr=0x0000, size=16384)
     plm.load(a, [0, 0], [64, 128], out=tile_a)
 
-    tile_b = plm.create_tile([64, 128], dtype=pl.FP16, target_memory=pl.MemorySpace.Vec,
-                             addr=0x4000, size=16384)
+    tile_type_b = plm.TileType(
+        shape=[64, 128],
+        dtype=pl.FP16,
+        target_memory=pl.MemorySpace.Vec,
+    )
+    tile_b = plm.create_tile(tile_type_b, addr=0x4000, size=16384)
     plm.neg(tile_a, out=tile_b)
     return a
 
@@ -125,8 +176,12 @@ def test_load_kernel():
     assert "pto.alloc_tile" in mlir, "Expected pto.alloc_tile"
     assert "dtype=f16" in mlir, "Expected f16 dtype"
     assert "rows=64, cols=128" in mlir, "Expected 64x128 tile shape"
-    # tile_b is at 0x4000 = 16384 — should carry explicit base_addr
+    assert "v_row=32, v_col=64" in mlir, "Expected v_row=32, v_col=64 for valid_shape"
     assert "base_addr = 16384" in mlir, "Expected base_addr = 16384 for tile_b"
+    assert "blayout=col_major" in mlir, "Expected blayout=col_major"
+    assert "slayout=row_major" in mlir, "Expected slayout=row_major"
+    assert "fractal=2" in mlir, "Expected fractal=0"
+    assert "pad=1" in mlir, "Expected pad=0"
     assert "pto.partition_view" in mlir, "Expected pto.partition_view for load"
     assert "pto.tload" in mlir, "Expected pto.tload"
     assert mlir.count("pto.tload") == 2, f"Expected 2 tloads, got {mlir.count('pto.tload')}"

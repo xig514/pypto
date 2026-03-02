@@ -32,7 +32,16 @@ class ScopeManager:
         self.scope_types: list[str] = ["global"]  # Track type of each scope
         self.yielded_vars: dict[int, set[str]] = {}  # Track yielded variables per scope
         self.var_spans: list[dict[str, Span]] = [{}]  # Track span for each variable definition
+        self.python_vars: dict[str, Any] = {}
 
+    def define_python_var(self, name: str, value: Any, span: Any | None = None) -> None:
+        """Define a Python variable (non-IR value)."""
+        self.python_vars[name] = value
+
+    def get_python_var(self, name: str) -> Any | None:
+        """Get a Python variable by name."""
+        return self.python_vars.get(name)
+    
     def enter_scope(self, scope_type: str) -> None:
         """Enter a new scope.
 

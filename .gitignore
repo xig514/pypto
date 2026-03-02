@@ -198,3 +198,5 @@ coverage.xml
 # Package distributions
 dist/
 wheelhouse/
+
+cmake-build-debug

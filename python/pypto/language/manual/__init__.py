@@ -112,6 +112,7 @@ from .op.manual_ops import (
     subsc,
     subs,
     transpose,
+    TileType,
     ub_copy,
     xor,
     xors,
@@ -142,6 +143,7 @@ INDEX = DataType.INDEX
 __all__ = [
     # Types
     "Tensor", "Tile", "Scalar", "DynVar", "dynamic",
+    "TileType",
     "MemorySpace",
     # Allocation
     "create_tile",
