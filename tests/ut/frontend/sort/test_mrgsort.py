@@ -141,6 +141,18 @@ def test_mrgsort():
     print(f"\nMax diff: {sorted_diff}")
     
     assert sorted_diff < 1e-3, f"mrgsort failed: max diff {sorted_diff}"
+
+    idx_low = sorted_out[0, 2::4].view(torch.uint16)
+    idx_high = sorted_out[0, 3::4].view(torch.uint16)
+    extracted_indices = (idx_high.to(torch.int32) << 16) | idx_low.to(torch.int32)
+    
+    print("\nExtracted indices[:16]:", extracted_indices[:16])
+    print("Expected indices[:16]:", expected_indices[0, :16])
+    
+    indices_match = torch.all(extracted_indices == expected_indices[0, :])
+    print(f"\nIndices match: {indices_match}")
+    
+    assert indices_match, "mrgsort failed: indices do not match"
     print("mrgsort test passed!")
 
 
