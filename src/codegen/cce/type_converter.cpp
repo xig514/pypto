@@ -19,8 +19,11 @@
 
 #include "pypto/core/error.h"
 #include "pypto/core/logging.h"
+#include "pypto/ir/expr.h"
+#include "pypto/ir/kind_traits.h"
 #include "pypto/ir/memref.h"
 #include "pypto/ir/pipe.h"
+#include "pypto/ir/scalar_expr.h"
 #include "pypto/ir/type.h"
 
 namespace pypto {
@@ -28,6 +31,18 @@ namespace pypto {
 namespace codegen {
 
 namespace {
+
+// Resolve a valid_shape ExprPtr to a string for use in the Tile<> type template.
+// Only ConstInt values are supported (Var → compile-time unknown, skip).
+// Returns "" if the expression cannot be resolved to a constant.
+std::string ResolveValidShapeDim(const ir::ExprPtr& expr, int64_t fallback) {
+  if (!expr) return std::to_string(fallback);
+  if (auto c = ir::As<ir::ConstInt>(expr)) {
+    return (c->value_ == -1) ? std::to_string(fallback) : std::to_string(c->value_);
+  }
+  // Var or other dynamic expression: cannot embed in template parameter.
+  return "";
+}
 
 std::string ConvertTilePadToPTOValue(ir::TilePad pad) {
   switch (pad) {
@@ -60,6 +75,9 @@ std::string TypeConverter::ConvertTileType(const ir::TileTypePtr& tile_type, int
     if (cols == 1) {
       BLayout = "ColMajor";
     }
+    // Compute type-template rows/cols: use valid_shape if present and constant.
+    std::string type_rows = std::to_string(rows);
+    std::string type_cols = std::to_string(cols);
     if (tile_type->tile_view_.has_value()) {
       const auto& tv = tile_type->tile_view_.value();
       BLayout = ConvertTileLayout(tv.blayout);
@@ -71,9 +89,16 @@ std::string TypeConverter::ConvertTileType(const ir::TileTypePtr& tile_type, int
       if (tv.blayout == TL::col_major && tv.slayout == TL::row_major) tile_type_str = "TileType::Mat";
       else if (tv.blayout == TL::row_major && tv.slayout == TL::row_major) tile_type_str = "TileType::Left";
       else if (tv.blayout == TL::row_major && tv.slayout == TL::col_major) tile_type_str = "TileType::Right";
+      // Override rows/cols from valid_shape if available.
+      if (!tv.valid_shape.empty()) {
+        std::string r = tv.valid_shape.size() >= 1 ? ResolveValidShapeDim(tv.valid_shape[0], rows) : "";
+        std::string c = tv.valid_shape.size() >= 2 ? ResolveValidShapeDim(tv.valid_shape[1], cols) : "";
+        if (!r.empty()) type_rows = r;
+        if (!c.empty()) type_cols = c;
+      }
     }
     type_alias << "Tile<" << tile_type_str << ", " << tile_type->dtype_.ToCTypeString() << ", " << rows
-               << ", " << cols << ", BLayout::" << BLayout << ", -1, -1, SLayout::" << SLayout << ", "
+               << ", " << cols << ", BLayout::" << BLayout << ", " << type_rows << ", " << type_cols << ", SLayout::" << SLayout << ", "
                << fractal;
     if (!pad_value.empty()) {
       type_alias << ", " << pad_value;
@@ -89,6 +114,9 @@ std::string TypeConverter::ConvertTileType(const ir::TileTypePtr& tile_type, int
   std::string SLayout = "NoneBox";
   std::string fractal = "512";
   std::string pad_value;
+  // Compute type-template rows/cols: use valid_shape if present and constant.
+  std::string type_rows = std::to_string(rows);
+  std::string type_cols = std::to_string(cols);
 
   if (cols == 1) {
     BLayout = "ColMajor";
@@ -99,8 +127,18 @@ std::string TypeConverter::ConvertTileType(const ir::TileTypePtr& tile_type, int
     fractal = std::to_string(tv.fractal);
     pad_value = ConvertTilePadToPTOValue(tv.pad);
   }
+  // Override rows/cols from valid_shape if available (independent of cols==1 branch).
+  if (tile_type->tile_view_.has_value()) {
+    const auto& tv = tile_type->tile_view_.value();
+    if (!tv.valid_shape.empty()) {
+      std::string r = tv.valid_shape.size() >= 1 ? ResolveValidShapeDim(tv.valid_shape[0], rows) : "";
+      std::string c = tv.valid_shape.size() >= 2 ? ResolveValidShapeDim(tv.valid_shape[1], cols) : "";
+      if (!r.empty()) type_rows = r;
+      if (!c.empty()) type_cols = c;
+    }
+  }
   type_alias << "Tile<" << tile_type_str << ", " << tile_type->dtype_.ToCTypeString() << ", " << rows << ", "
-             << cols << ", BLayout::" << BLayout << ", -1, -1, SLayout::" << SLayout << ", " << fractal;
+             << cols << ", BLayout::" << BLayout << ", " << type_rows << ", " << type_cols << ", SLayout::" << SLayout << ", " << fractal;
   if (!pad_value.empty()) {
     type_alias << ", " << pad_value;
   }

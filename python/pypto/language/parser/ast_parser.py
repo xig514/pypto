@@ -2701,6 +2701,8 @@ class ASTParser:
             return self._resolve_attribute_kwarg(value)
         elif isinstance(value, ast.List):
             return self._resolve_list_kwarg(value)
+        elif isinstance(value, ast.Subscript):
+            return self._resolve_subscript_kwarg(value)
         else:
             return self.parse_expression(value)
 
@@ -2742,6 +2744,13 @@ class ASTParser:
         if success and isinstance(result, list):
             return result
         return self.parse_list(value)
+
+    def _resolve_subscript_kwarg(self, value: ast.Subscript) -> Any:
+        """Resolve a Subscript kwarg value (e.g., MY_LIST[0]), trying closure eval first."""
+        success, result = self.expr_evaluator.try_eval_expr(value)
+        if success:
+            return result
+        return self.parse_expression(value)
 
     def _parse_tensor_op(self, op_name: str, call: ast.Call) -> ir.Expr:
         """Parse tensor operation.
@@ -3561,6 +3570,8 @@ class ASTParser:
         "col_expand_mul",
         "col_expand_div",
         "col_expand_sub",
+        "col_max",
+        "col_sum",
         "expands",
         "matmul_bias",
         "gemv",

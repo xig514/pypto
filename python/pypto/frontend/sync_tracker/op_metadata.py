@@ -83,6 +83,8 @@ _OP_TO_PIPE: dict[str, PipeType] = {
     # Vector – reduction
     "row_max": PipeType.V,
     "row_sum": PipeType.V,
+    "col_max": PipeType.V,
+    "col_sum": PipeType.V,
     "row_min": PipeType.V,
     # Vector – broadcast
     "row_expand": PipeType.V,
@@ -211,6 +213,8 @@ _OP_TILE_ACCESS: dict[str, TileAccessPattern] = {
     "row_max": TileAccessPattern([1], [0, 2]),
     "row_sum": TileAccessPattern([1], [0, 2]),
     "row_min": TileAccessPattern([1], [0, 2]),
+    "col_max": TileAccessPattern([1], [0, 2]),
+    "col_sum": TileAccessPattern([1], [0, 2]),
     # Broadcast  – DSL: row_expand(out, src)
     "row_expand":     TileAccessPattern([1],    [0]),
     "row_expand_add": TileAccessPattern([1, 2], [0]),

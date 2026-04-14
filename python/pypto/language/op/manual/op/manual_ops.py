@@ -912,6 +912,16 @@ def row_min(tile: Tile, tmp: Tile, out: Tile) -> None:
     _op("manual.row_min", [tile.unwrap(), tmp.unwrap()], out)
 
 
+def col_max(tile: Tile, tmp: Tile, out: Tile) -> None:
+    """Col-wise max reduction: out[0, j] = max_i(tile[i, j])."""
+    _op("manual.col_max", [tile.unwrap(), tmp.unwrap()], out)
+
+
+def col_sum(tile: Tile, tmp: Tile, out: Tile) -> None:
+    """Col-wise sum reduction: out[0, j] = sum_i(tile[i, j])."""
+    _op("manual.col_sum", [tile.unwrap(), tmp.unwrap()], out)
+
+
 # ---------------------------------------------------------------------------
 # Sorting operations
 # ---------------------------------------------------------------------------
@@ -1114,7 +1124,7 @@ __all__ = [
     # gather
     "gather", "gatherb",
     # Reduction
-    "row_max", "row_sum", "row_min",
+    "row_max", "row_sum", "row_min", "col_max", "col_sum",
     # Sorting
     "sort32", "mrgsort",
     # Broadcast

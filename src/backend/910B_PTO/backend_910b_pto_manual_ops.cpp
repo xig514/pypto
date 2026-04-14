@@ -1415,6 +1415,18 @@ REGISTER_BACKEND_OP(Backend910B_PTO, "manual.row_min")
       return MakeManualBinaryPTO("pto.trowmin", op, codegen);
     });
 
+REGISTER_BACKEND_OP(Backend910B_PTO, "manual.col_max")
+    .set_pipe(ir::PipeType::V)
+    .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
+      return MakeManualBinaryPTO("pto.tcolmax", op, codegen);
+    });
+
+REGISTER_BACKEND_OP(Backend910B_PTO, "manual.col_sum")
+    .set_pipe(ir::PipeType::V)
+    .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
+      return MakeManualBinaryPTO("pto.tcolsum", op, codegen);
+    });
+
 // ----------------------------------------------------------------------------
 // Broadcast expansion
 // ----------------------------------------------------------------------------

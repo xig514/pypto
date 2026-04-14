@@ -95,6 +95,7 @@ from .auto.op.auto_ops import assemble, create_tensor, dim
 
 # Promoted ptr ops (accessible as pl.make_tensor, pl.addptr)
 from .ptr_ops import addptr, make_tensor
+from .manual.op.manual_ops import col_max, col_sum
 
 # Unified dispatch (overlapping ops)
 from .auto.op.auto_ops import (
@@ -166,6 +167,8 @@ __all__ = [
     "col_expand_mul",
     "col_expand_div",
     "col_expand_sub",
+    "col_max",
+    "col_sum",
     "expands",
     "rem",
     "rems",

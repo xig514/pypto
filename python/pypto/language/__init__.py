@@ -120,6 +120,7 @@ from .op.auto.op.auto_ops import (
     setval,
 )
 from .op.ptr_ops import addptr, make_tensor
+from .op.manual.op.manual_ops import col_max, col_sum
 from .op.auto.op.auto_ops import assemble, create_tensor, dim
 from .op.auto.op.auto_ops import (
     add,
@@ -290,6 +291,8 @@ __all__ = [
     "col_expand_mul",
     "col_expand_div",
     "col_expand_sub",
+    "col_max",
+    "col_sum",
     "expands",
     "rem",
     "rems",

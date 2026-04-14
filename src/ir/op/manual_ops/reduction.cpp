@@ -86,6 +86,28 @@ REGISTER_OP("manual.row_min")
       return DeduceManualOutTileType(args, kwargs, "manual.row_min", 3);
     });
 
+REGISTER_OP("manual.col_max")
+    .set_op_category("ManualOp")
+    .set_description("Manual col-wise max reduction: out[0,j] = max_i(tile[i,j])")
+    .add_argument("tile", "Input tile (TileType)")
+    .add_argument("tmp", "Scratch tile required by hardware (TileType)")
+    .add_argument("out", "Pre-allocated output col vector tile [1,N] (TileType)")
+    .f_deduce_type([](const std::vector<ExprPtr>& args,
+                      const std::vector<std::pair<std::string, std::any>>& kwargs) {
+      return DeduceManualOutTileType(args, kwargs, "manual.col_max", 3);
+    });
+
+REGISTER_OP("manual.col_sum")
+    .set_op_category("ManualOp")
+    .set_description("Manual col-wise sum reduction: out[0,j] = sum_i(tile[i,j])")
+    .add_argument("tile", "Input tile (TileType)")
+    .add_argument("tmp", "Scratch tile required by hardware (TileType)")
+    .add_argument("out", "Pre-allocated output col vector tile [1,N] (TileType)")
+    .f_deduce_type([](const std::vector<ExprPtr>& args,
+                      const std::vector<std::pair<std::string, std::any>>& kwargs) {
+      return DeduceManualOutTileType(args, kwargs, "manual.col_sum", 3);
+    });
+
 // ---------------------------------------------------------------------------
 // Broadcast / expansion operations
 // ---------------------------------------------------------------------------

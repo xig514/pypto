@@ -1384,10 +1384,8 @@ void CCECodegen::VisitStmt_(const ir::IfStmtPtr& op) {
         std::string tile_type_str = type_converter_.ConvertTileType(tile_type, rows, cols);
         if (loop_depth_ > 0) {
           loop_hoisted_decls_.push_back("using " + type_alias_name + " = " + tile_type_str + ";");
-          loop_hoisted_decls_.push_back(type_alias_name + " " + return_var_name + "(" + ctor_args + ");");
         } else {
           emitter_.EmitLine("using " + type_alias_name + " = " + tile_type_str + ";");
-          emitter_.EmitLine(type_alias_name + " " + return_var_name + "(" + ctor_args + ");");
         }
       } else if (auto tensor_type = std::dynamic_pointer_cast<const ir::TensorType>(return_var->GetType())) {
         GenerateGlobalTensorTypeDeclaration(return_var_name, tensor_type);
@@ -2285,8 +2283,8 @@ void CCECodegen::GenerateTileTypeDeclaration(const std::string& var_name, const 
     int64_t addr =
         ExtractConstInt((*tile_type->memref_)->addr_);  // NOLINT(bugprone-unchecked-optional-access)
     std::string addr_str = FormatAddressHex(addr);
-    emitter_.EmitLine(type_alias_name + " " + var_name + "(" +
-                      ctor_args + "); TASSIGN(" +
+    emitter_.EmitLine(type_alias_name + " " + var_name + 
+                      "; TASSIGN(" +
                       var_name + ", " + addr_str + ");");
     tile_addresses_[var_name] = addr_str;
   } else {

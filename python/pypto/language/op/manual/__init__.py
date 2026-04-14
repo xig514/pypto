@@ -54,6 +54,8 @@ from .op.manual_ops import (
     col_expand_div,
     col_expand_mul,
     col_expand_sub,
+    col_max,
+    col_sum,
     make_tile,
     div,
     divs,
@@ -187,7 +189,7 @@ __all__ = [
     "sort32", "mrgsort",
     # Broadcast
     "row_expand", "row_expand_add", "row_expand_sub", "row_expand_mul", "row_expand_div",
-    "col_expand", "col_expand_mul", "col_expand_div", "col_expand_sub",
+    "col_expand", "col_expand_mul", "col_expand_div", "col_expand_sub", "col_max", "col_sum",
     "expands",
     # Matrix
     "matmul", "matmul_acc", "matmul_bias",
