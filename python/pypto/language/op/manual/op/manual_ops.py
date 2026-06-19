@@ -35,7 +35,7 @@ from typing import Literal, Optional, Sequence, Union
 from dataclasses import dataclass
 from pypto.ir.op import block_ops as _ir_block_ops
 from pypto.ir.op import manual_ops as _ir_manual
-from pypto.ir.utils import _to_make_tuple
+from pypto.ir.utils import _normalize_expr, _to_make_tuple
 from pypto.pypto_core import DataType
 from pypto.pypto_core import ir as _ir_core
 from pypto.pypto_core.ir import Expr, MemorySpace, Span
@@ -686,8 +686,14 @@ def gatherb(src: Tile, offsets: Tile, out: Tile) -> None:
 # Element-wise Tile x Scalar binary operations
 # ---------------------------------------------------------------------------
 
+
 def _scalar_expr(v: int | float | Expr | Scalar) -> Expr:
-    return v.unwrap() if isinstance(v, Scalar) else v
+    if isinstance(v, Scalar):
+        return v.unwrap()
+    elif isinstance(v, (int, float)):
+        return _normalize_expr(v, _span())
+    else:
+        return v
 
 
 def adds(lhs: Tile, rhs: int | float | Expr | Scalar, out: Tile) -> None:
@@ -855,9 +861,17 @@ def subsc(lhs: Tile, rhs: int | float | Expr | Scalar, rhs2: Tile, out: Tile) ->
     _op("manual.subsc", [lhs.unwrap(), _scalar_expr(rhs), rhs2.unwrap()], out)
 
 
-def sel(mask: Tile, lhs: Tile, rhs: Tile, out: Tile) -> None:
-    """Per-element selection: out[i] = lhs[i] if mask[i] else rhs[i]."""
-    _op("manual.sel", [mask.unwrap(), lhs.unwrap(), rhs.unwrap()], out)
+def sel(mask: Tile, lhs: Tile, rhs: Tile, tmp: Tile, out: Tile) -> None:
+    """Per-element selection: out[i] = lhs[i] if mask[i] else rhs[i].
+
+    Args:
+        mask: Predicate mask tile.
+        lhs: Value when mask is true.
+        rhs: Value when mask is false.
+        tmp: Temporary scratch tile required by the current DPS form.
+        out: Pre-allocated output tile; rebound on return.
+    """
+    _op("manual.sel", [mask.unwrap(), lhs.unwrap(), rhs.unwrap(), tmp.unwrap()], out)
 
 
 def sels(lhs: Tile, rhs: Tile, select_mode: int | float | Expr | Scalar, out: Tile) -> None:

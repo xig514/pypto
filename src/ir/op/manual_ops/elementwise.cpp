@@ -374,17 +374,18 @@ REGISTER_OP("manual.subsc")
       return DeduceManualOutType(args, kwargs, "manual.subsc", 4);
     });
 
-// Selection (mask, lhs, rhs, out): 4 args.
+// Selection (mask, lhs, rhs, tmp, out): 5 args.
 REGISTER_OP("manual.sel")
     .set_op_category("ManualOp")
-    .set_description("Manual per-element selection: out[i]=lhs[i] if mask[i] else rhs[i]")
+    .set_description("Manual per-element selection: out[i]=lhs[i] if mask[i] else rhs[i]; tmp is scratch buffer")
     .add_argument("mask", "Predicate mask tile (TileType)")
     .add_argument("lhs", "True-branch tile (TileType)")
     .add_argument("rhs", "False-branch tile (TileType)")
+    .add_argument("tmp", "Scratch tile required by hardware (TileType)")
     .add_argument("out", "Pre-allocated output tile (TileType)")
     .f_deduce_type([](const std::vector<ExprPtr>& args,
                       const std::vector<std::pair<std::string, std::any>>& kwargs) {
-      return DeduceManualOutType(args, kwargs, "manual.sel", 4);
+      return DeduceManualOutType(args, kwargs, "manual.sel", 5);
     });
 
 // sels (lhs, rhs, scalar_mode, out): 4 args.

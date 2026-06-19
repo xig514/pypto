@@ -1358,7 +1358,7 @@ REGISTER_BACKEND_OP(Backend910B_PTO, "manual.subsc")
 REGISTER_BACKEND_OP(Backend910B_PTO, "manual.sel")
     .set_pipe(ir::PipeType::V)
     .f_codegen([](const ir::CallPtr& op, codegen::CodegenBase& codegen) {
-      return MakeManualTernaryPTO("pto.tsel", op, codegen);
+      return MakeManualQuaternaryPTO("pto.tsel", op, codegen);
     });
 
 REGISTER_BACKEND_OP(Backend910B_PTO, "manual.sels")
